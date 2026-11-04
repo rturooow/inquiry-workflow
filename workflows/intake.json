@@ -1,0 +1,274 @@
+{
+  "id": "e4da3e29-c6fb-4419-890e-27321665177a",
+  "name": "InquiryFlow · Submit an inquiry",
+  "nodes": [
+    {
+      "id": "9b0b6886-0b99-4b83-80fe-a943092b4387",
+      "name": "Customer inquiry",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "authentication": "none",
+        "options": {
+          "path": "inquiryflow-intake",
+          "useWorkflowTimezone": true
+        },
+        "formTitle": "Website project inquiry",
+        "formDescription": "Tell the agency what you need. Your contact details stay private.",
+        "responseMode": "lastNode",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "Your name",
+              "fieldName": "name"
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true,
+              "placeholder": "you@example.com",
+              "fieldName": "email"
+            },
+            {
+              "fieldLabel": "Service",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldName": "service",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Website"
+                  },
+                  {
+                    "option": "E-commerce"
+                  },
+                  {
+                    "option": "Maintenance"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "What do you need help with?",
+              "fieldName": "message"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8c6bd8c6-d803-48cc-ba1e-cb386c3f889c",
+      "name": "Validate and normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item=$input.first().json; const clean=v=>typeof v==='string'?v.trim().replace(/\\s+/g,' '):'';\nconst data={name:clean(item.name),email:clean(item.email).toLowerCase(),service:clean(item.service),message:clean(item.message)};const errors=[];\nif(data.name.length<2||data.name.length>100)errors.push('Check the name.');\nif(data.email.length>254||!/^\\S+@\\S+\\.\\S+$/.test(data.email))errors.push('Enter a valid email address.');\nif(!['Website','E-commerce','Maintenance'].includes(data.service))errors.push('Choose a listed service.');\nif(data.message.length<10||data.message.length>4000)errors.push('Message must contain 10 to 4,000 characters.');\nreturn [{json:{valid:errors.length===0,data,error:errors.join(' ')}}];"
+      }
+    },
+    {
+      "id": "17ecc25a-b188-49c4-bad4-46ab51a4b8b1",
+      "name": "Is inquiry valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "de55a159-a856-41bb-81c6-fc988af48485",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "be50541e-9b5c-4be9-8df2-9a0756167139",
+      "name": "Save inquiry and queue alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_submit",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({p_input:$json.data}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    },
+    {
+      "id": "785ee245-5a17-4e80-bab8-b7b571b59c38",
+      "name": "Prepare confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$json.body;if($json.statusCode<200||$json.statusCode>=300||!r?.ok)return [{json:{title:'Unable to save inquiry',message:'Something went wrong. Please try again later.'}}];\nreturn [{json:{title:r.duplicate?'Inquiry already received':'Inquiry received',message:'Thank you. Reference: '+String(r.inquiry_id||'').slice(0,8).toUpperCase()}}];"
+      }
+    },
+    {
+      "id": "82005711-872d-47cc-b7ac-541467544ae7",
+      "name": "Inquiry received",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Inquiry received",
+        "completionMessage": "Your inquiry has been saved. The agency will follow up."
+      }
+    },
+    {
+      "id": "07e52af0-2e56-48b6-b391-f5aebf7ecc36",
+      "name": "Check your details",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Check your details",
+        "completionMessage": "Check the required fields and submit again."
+      }
+    }
+  ],
+  "connections": {
+    "Customer inquiry": {
+      "main": [
+        [
+          {
+            "node": "Validate and normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and normalize": {
+      "main": [
+        [
+          {
+            "node": "Is inquiry valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is inquiry valid?": {
+      "main": [
+        [
+          {
+            "node": "Save inquiry and queue alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check your details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save inquiry and queue alert": {
+      "main": [
+        [
+          {
+            "node": "Prepare confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare confirmation": {
+      "main": [
+        [
+          {
+            "node": "Inquiry received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "active": false,
+  "versionId": "e64d7fdc-944c-4b97-9176-e85572dcdfc9",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

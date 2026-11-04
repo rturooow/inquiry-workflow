@@ -1,0 +1,262 @@
+{
+  "id": "3bde5a44-6c68-4f1f-8111-bc3ed8b0b8a2",
+  "name": "InquiryFlow · Update inquiry status",
+  "nodes": [
+    {
+      "id": "13046fb8-b349-4182-aa23-6a19441ef650",
+      "name": "Agency staff update",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "authentication": "basicAuth",
+        "options": {
+          "path": "inquiryflow-staff"
+        },
+        "formTitle": "Update an inquiry",
+        "formDescription": "Mark it contacted or closed.",
+        "responseMode": "lastNode",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Inquiry reference",
+              "fieldType": "text",
+              "requiredField": true,
+              "fieldName": "inquiry_id",
+              "placeholder": "Paste the reference from the email"
+            },
+            {
+              "fieldLabel": "Status",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldName": "status",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "contacted"
+                  },
+                  {
+                    "option": "closed"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "INQUIRYFLOW_STAFF",
+          "name": "InquiryFlow Staff Form"
+        }
+      }
+    },
+    {
+      "id": "96e83f45-fb5c-4e59-a0c3-617f1ab4f1f0",
+      "name": "Validate staff update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const i=$input.first().json;const id=typeof i.inquiry_id==='string'?i.inquiry_id.trim():'';const status=typeof i.status==='string'?i.status.trim():'';\nconst valid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&['contacted','closed'].includes(status);return [{json:{valid,id,status}}];"
+      }
+    },
+    {
+      "id": "d6b0b5aa-0d7a-4cee-ac31-8b9e6115439d",
+      "name": "Is update valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2400,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8334f54f-af65-4bb8-a2fb-22a7f42e5731",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c7c527ef-c198-4dac-bf02-0f91aa752cff",
+      "name": "Save status change",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_update_status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({p_inquiry_id:$json.id,p_status:$json.status}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    },
+    {
+      "id": "4dec9fa3-fdf7-4b83-8ddf-93ebfd4aea34",
+      "name": "Prepare status result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$json.body;if($json.statusCode<200||$json.statusCode>=300||!r?.ok)return [{json:{title:'Update not saved',message:r?.error||'Check the reference and status.'}}];\nreturn [{json:{title:'Status saved',message:'Inquiry marked '+r.status+'.'}}];"
+      }
+    },
+    {
+      "id": "e74c7c75-5774-4860-9780-51e14a95b340",
+      "name": "Status saved",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        3120,
+        300
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Status saved",
+        "completionMessage": "Inquiry status updated."
+      }
+    },
+    {
+      "id": "1fa1bd52-0bf7-4673-ad9f-b362c8b113e6",
+      "name": "Check the reference",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        3360,
+        300
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Check the reference",
+        "completionMessage": "Enter a valid inquiry reference and choose contacted or closed."
+      }
+    }
+  ],
+  "connections": {
+    "Agency staff update": {
+      "main": [
+        [
+          {
+            "node": "Validate staff update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate staff update": {
+      "main": [
+        [
+          {
+            "node": "Is update valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is update valid?": {
+      "main": [
+        [
+          {
+            "node": "Save status change",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check the reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save status change": {
+      "main": [
+        [
+          {
+            "node": "Prepare status result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare status result": {
+      "main": [
+        [
+          {
+            "node": "Status saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "active": false,
+  "versionId": "2738e233-13f2-4576-9b46-c2ce5cb71289",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

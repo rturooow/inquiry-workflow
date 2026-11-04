@@ -1,0 +1,126 @@
+{
+  "id": "09f8e6ee-d1ca-4363-8556-cb665766052a",
+  "name": "InquiryFlow · Schedule reminders and reports",
+  "nodes": [
+    {
+      "id": "b8a2b500-a59c-4e17-8d0b-10cf8253da6a",
+      "name": "Every five minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        3600,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "931f4a05-2938-4592-803a-aaf3f86d8206",
+      "name": "Queue eligible reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3840,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_schedule_reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    },
+    {
+      "id": "bcd1738e-dc8a-4920-913c-e2f42b6a5986",
+      "name": "Queue weekly summaries",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4080,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_schedule_reports",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every five minutes": {
+      "main": [
+        [
+          {
+            "node": "Queue eligible reminders",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Queue weekly summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "active": false,
+  "versionId": "3a85143e-52d1-49d0-b8c9-4f32292446ad",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,50 @@
+name: inquiry-flow-tests
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: inquiryflow-local-tests-only
+      POSTGRES_DB: inquiryflow_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - inquiryflow_test_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inquiryflow_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  database-tests:
+    image: postgres:17.7-alpine
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: inquiryflow-local-tests-only
+      PGDATABASE: inquiryflow_test
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        psql -v ON_ERROR_STOP=1 -f /tests/bootstrap-roles.sql &&
+        psql -v ON_ERROR_STOP=1 -f /migrations/001_inquiryflow.sql &&
+        psql -v ON_ERROR_STOP=1 -f /tests/database.test.sql &&
+        /tests/concurrency.test.sh
+    volumes:
+      - ./tests:/tests:ro
+      - ./supabase/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  javascript-tests:
+    image: node:24.11.0-alpine
+    working_dir: /work
+    command: ["node", "--test", "tests/unit.test.mjs", "tests/workflows.test.mjs"]
+    volumes:
+      - ./src:/work/src:ro
+      - ./tests:/work/tests:ro
+      - ./workflows:/work/workflows:ro
+
+volumes:
+  inquiryflow_test_db:

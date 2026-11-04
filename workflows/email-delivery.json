@@ -1,0 +1,331 @@
+{
+  "id": "373aa4e6-ab79-4259-9e46-85ca46814a34",
+  "name": "InquiryFlow · Deliver queued emails",
+  "nodes": [
+    {
+      "id": "72837661-4b02-4118-addc-538be77531ba",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        4320,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "* * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6b2830a8-6bb0-461a-b6f6-d7ed749922f4",
+      "name": "Claim queued emails",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4560,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    },
+    {
+      "id": "42bd88fe-a1e1-4472-b25b-bf279badd799",
+      "name": "Split claimed emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4800,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobs=$json.body?.jobs;return Array.isArray(jobs)?jobs.map(job=>({json:job})):[];"
+      }
+    },
+    {
+      "id": "ac71c0c1-8b41-4649-9bc0-d87a8817a385",
+      "name": "Authorize email send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5040,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_authorize_send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({p_id:$json.id,p_lease_token:$json.lease_token}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    },
+    {
+      "id": "361c75bb-4553-4b00-a513-b1fd4e42a510",
+      "name": "Is send still allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5280,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b86e0a1d-d415-45fb-9fa3-8a82d5d4a119",
+              "leftValue": "={{ $json.body?.allowed === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bbb40593-b1d1-4bd9-84df-ad6246dc8b08",
+      "name": "Send email via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5520,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.event_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body.payload) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_RESEND",
+          "name": "InquiryFlow Resend"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6073c631-4bec-40e8-bd04-5860eb4333d6",
+      "name": "Classify delivery result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const a=$('Authorize email send').item.json.body;const r=$json||{};const s=Number(r.statusCode||0);const b=r.body||{};\nconst success=s>=200&&s<300&&typeof b.id==='string'&&b.id.length>0;const transient=!success&&(s===0||s===408||s===429||s>=500||(s===409&&b.name==='concurrent_idempotent_requests'));\nconst h=r.headers?.['retry-after'];const n=Number(h);const retry=h==null?0:Number.isFinite(n)?n:Math.ceil((Date.parse(h)-Date.now())/1000);\nreturn [{json:{id:a.id,lease_token:a.lease_token,success,provider_id:success?b.id:null,transient,error:success?null:s?'Resend HTTP '+s+(b.name?' ('+String(b.name).slice(0,100)+')':''):'Transport error; outcome unknown',retry_after_seconds:Number.isFinite(retry)?Math.max(0,Math.min(86400,Math.ceil(retry))):0}}];"
+      }
+    },
+    {
+      "id": "86280a8f-ebeb-437e-be31-11bbb776171b",
+      "name": "Record email result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6000,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-project-ref.supabase.co/rest/v1/rpc/iflow_finish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({p_id:$json.id,p_lease_token:$json.lease_token,p_success:$json.success,p_provider_id:$json.provider_id,p_transient:$json.transient,p_error:$json.error,p_retry_after_seconds:$json.retry_after_seconds}) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "INQUIRYFLOW_SUPABASE",
+          "name": "InquiryFlow Supabase"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "Claim queued emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim queued emails": {
+      "main": [
+        [
+          {
+            "node": "Split claimed emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split claimed emails": {
+      "main": [
+        [
+          {
+            "node": "Authorize email send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorize email send": {
+      "main": [
+        [
+          {
+            "node": "Is send still allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is send still allowed?": {
+      "main": [
+        [
+          {
+            "node": "Send email via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send email via Resend": {
+      "main": [
+        [
+          {
+            "node": "Classify delivery result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify delivery result": {
+      "main": [
+        [
+          {
+            "node": "Record email result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "active": false,
+  "versionId": "04ebf0e2-34cd-4cd8-b5c6-11d650c48687",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

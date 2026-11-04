@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Jordan Lee",
+    "email": "jordan@example.test",
+    "service": "Website",
+    "message": "Please build a new website for my studio."
+  },
+  {
+    "name": "Alex Chen",
+    "email": "alex@example.test",
+    "service": "E-commerce",
+    "message": "I want a small online shop for handmade ceramics."
+  },
+  {
+    "name": "Maya Tan",
+    "email": "maya@example.test",
+    "service": "Maintenance",
+    "message": "Please review and update our existing portfolio website."
+  }
+]
