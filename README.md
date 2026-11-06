@@ -24,21 +24,14 @@ flowchart LR
 
 n8n keeps service credentials server-side. Supabase denies browser table access with row-level security. Email goes only to the owner's configured account.
 
-## Free tools
+## Tools
 
-- **n8n** visual workflows and forms, self-hosted on your PC with Docker.
+- **n8n** visual workflows and forms, self-hosted on PC with Docker.
 - **Supabase** managed PostgreSQL. The [Free plan includes 500 MB](https://supabase.com/pricing); free projects may pause after a week with low activity ([recovery details](https://supabase.com/docs/guides/platform/free-project-pausing)).
 - **Resend** transactional email. Its [Free plan](https://resend.com/pricing) has usage limits, and the test sender delivers only to the address on the Resend account ([sender restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain)).
 
 Plan limits can change. The demo uses free-tier plans and needs internet. This is a local demo, not a public web service.
 
-## Requirements
-
-Windows 11, hardware virtualization enabled, at least 8 GB RAM, Docker Desktop with WSL 2, and free [Supabase](https://supabase.com/dashboard) and [Resend](https://resend.com/signup) accounts.
-
-Node.js and npm do not need to be installed on the host. The test container supplies its own Node.js.
-
-Docker Desktop may need Windows administrator approval to install or update WSL. Approve the Windows prompt and restart when convenient. I will not restart Windows automatically.
 
 ## Setup
 
@@ -161,6 +154,6 @@ order by created_at desc;
 
 A timeout may mean Resend already accepted the message. Check Resend's logs before replay. Only if the provider did **not** accept it, manually call **public.iflow_replay** with the notification UUID and a clear explanation of at least 10 characters. Replays retain the message and event key. Never change the key to work around an uncertain send.
 
-## Portfolio walkthrough
+## Walkthrough
 
 Show validation, submit one fictional inquiry, demonstrate duplicate reuse while it is still new, confirm the email, then mark the inquiry contacted. Explain how the unique index, worker claim, and Resend idempotency protect retries. Say that **contacted** is manually recorded; this demo does not read replies.
